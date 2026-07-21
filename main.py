@@ -1,6 +1,7 @@
 import sqlite3
 from logic import Student, Instructor, Admin, Course
 
+
 def login(conn):
     cursor = conn.cursor()
     print("Welcome to LeopardWeb Registration System!")
