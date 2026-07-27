@@ -119,4 +119,4 @@ def test_admin_logout_exits_menu(seeded_conn, monkeypatch, capsys):
 
     assert "Logging out..." in capsys.readouterr().out
 
-    print(0)
+    
