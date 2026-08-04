@@ -1,4 +1,11 @@
 import sqlite3
+#from main import gui_print
+
+def gui_print(label_info, text_to_be_printed):
+    current_text = label_info.cget("text")
+    label_info.config(text = current_text+" \n")
+    current_text = label_info.cget("text")
+    label_info.config(text =  current_text + text_to_be_printed)
 
 class Course:
     def __init__(self, crn, title, dept, time, days, semester, year, credits, instructor_id=None):
@@ -24,7 +31,10 @@ class User:
         self.last_name = last_name
         self.email = email
 
-    def search_courses(self, param=None):
+    def search_courses(self, label_info, param=None):
+
+        print("pram in search_courses: "+str(param))
+
         if param:
             self.cursor.execute("SELECT * FROM COURSE WHERE TITLE LIKE ? OR DEPARTMENT LIKE ?", (f'%{param}%', f'%{param}%'))
         else:
@@ -33,8 +43,11 @@ class User:
         results = self.cursor.fetchall()
         courses = [Course(*row) for row in results]
         print("\n--- Course Search Results ---")
+        gui_print(label_info, "--- Course Search Results ---")
         for c in courses:
             print(c)
+            gui_print(label_info, str(c))
+            
         return courses
 
 class Student(User):
@@ -53,43 +66,66 @@ class Student(User):
 
     def check_conflicts(self, new_course):
         current_courses = self._get_schedule()
+        
+        # Calculate new course time block
+        new_start = int(new_course.time)
+        new_duration = int(new_course.credits / len(new_course.days))
+        new_end = new_start + new_duration
+        new_days = set(new_course.days)
+
         for course in current_courses:
-            if course.time == new_course.time:
-                if any(day in course.days for day in new_course.days):
+            # Calculate current course time block
+            curr_start = int(course.time)
+            curr_duration = int(course.credits / len(course.days))
+            curr_end = curr_start + curr_duration
+            curr_days = set(course.days)
+
+            # Check if there is any overlapping days
+            if new_days.intersection(curr_days):
+                # Check if times overlap
+                if max(new_start, curr_start) < min(new_end, curr_end):
                     return True
         return False
 
-    def add_course(self, crn):
+    def add_course(self, label_info, crn):
         self.cursor.execute("SELECT * FROM COURSE WHERE CRN = ?", (crn,))
         row = self.cursor.fetchone()
         if not row:
+            gui_print(label_info, "Error: Course not found.")
             print("Error: Course not found.")
             return
 
         new_course = Course(*row)
         if self.check_conflicts(new_course):
+            gui_print(label_info, "Error: Schedule conflict detected! Cannot add course.")
             print("Error: Schedule conflict detected! Cannot add course.")
             return
 
         try:
             self.cursor.execute("INSERT INTO REGISTRATION VALUES (?, ?)", (self.user_id, crn))
             self.conn.commit()
+            gui_print(label_info, f"Successfully added {new_course.title} to your schedule.")
             print(f"Successfully added {new_course.title} to your schedule.")
         except:
+            gui_print(label_info, "You are already enrolled in this course.")
             print("You are already enrolled in this course.")
 
-    def remove_course(self, crn):
+    def remove_course(self, label_info, crn):
         self.cursor.execute("DELETE FROM REGISTRATION WHERE STUDENT_ID = ? AND CRN = ?", (self.user_id, crn))
         self.conn.commit()
+        gui_print(label_info, "Course removed from schedule (if you were enrolled).")
         print("Course removed from schedule (if you were enrolled).")
 
-    def print_schedule(self):
+    def print_schedule(self, label_info):
         courses = self._get_schedule()
+        gui_print(label_info, "--- Your Class Schedule ---")
         print("\n--- Your Class Schedule ---")
         if not courses:
+            gui_print(label_info, "You are not enrolled in any courses.")
             print("You are not enrolled in any courses.")
         for c in courses:
-            print(c)
+            gui_print(label_info, str(c))
+            print(str(c))
 
 class Instructor(User):
     def __init__(self, db_conn, user_id, first_name, last_name, email, title, hire_year, dept):
@@ -98,16 +134,19 @@ class Instructor(User):
         self.hire_year = hire_year
         self.dept = dept
 
-    def print_teaching_schedule(self):
+    def print_teaching_schedule(self, label_info):
         self.cursor.execute("SELECT * FROM COURSE WHERE INSTRUCTOR_ID = ?", (self.user_id,))
         courses = [Course(*row) for row in self.cursor.fetchall()]
+        gui_print(label_info, "--- Your Teaching Schedule ---")
         print("\n--- Your Teaching Schedule ---")
         if not courses:
+            gui_print(label_info, "You are not assigned to teach any courses.")
             print("You are not assigned to teach any courses.")
         for c in courses:
+            gui_print(label_info, str(c))
             print(c)
 
-    def print_roster(self, crn):
+    def print_roster(self, label_info, crn):
         self.cursor.execute("""
             SELECT S.FIRST_NAME, S.LAST_NAME, S.EMAIL FROM STUDENT S
             JOIN REGISTRATION R ON S.ID = R.STUDENT_ID
@@ -115,10 +154,13 @@ class Instructor(User):
             WHERE C.CRN = ? AND C.INSTRUCTOR_ID = ?
         """, (crn, self.user_id))
         students = self.cursor.fetchall()
+        gui_print(label_info, f"--- General Roster for CRN {crn} ---")
         print(f"\n--- General Roster for CRN {crn} ---")
         if not students:
+            gui_print(label_info, "No students enrolled or you do not teach this course.")
             print("No students enrolled or you do not teach this course.")
         for s in students:
+            gui_print(label_info, f"{s[0]} {s[1]} ({s[2]})")
             print(f"{s[0]} {s[1]} ({s[2]})")
 
     def search_roster(self, crn, search_keyword):
@@ -141,7 +183,7 @@ class Admin(User):
         self.title = title
         self.office = office
 
-    def add_course(self, course_obj):
+    def add_course(self, label_info, course_obj):
         try:
             self.cursor.execute("""
                 INSERT INTO COURSE (CRN, TITLE, DEPARTMENT, TIME, DAYS, SEMESTER, YEAR, CREDITS, INSTRUCTOR_ID)
@@ -149,21 +191,26 @@ class Admin(User):
             """, (course_obj.crn, course_obj.title, course_obj.dept, course_obj.time, 
                   course_obj.days, course_obj.semester, course_obj.year, course_obj.credits, course_obj.instructor_id))
             self.conn.commit()
+            gui_print(label_info, "Course successfully added to the system.")
             print("Course successfully added to the system.")
         except Exception as e:
+            gui_print(label_info, f"--- Global Roster for CRN {crn} ---")
             print(f"Error adding course: {e}")
 
-    def print_roster(self, crn):
+    def print_roster(self, label_info, crn):
         self.cursor.execute("""
             SELECT S.FIRST_NAME, S.LAST_NAME, S.EMAIL FROM STUDENT S
             JOIN REGISTRATION R ON S.ID = R.STUDENT_ID
             WHERE R.CRN = ?
         """, (crn,))
         students = self.cursor.fetchall()
+        gui_print(label_info, f"--- Global Roster for CRN {crn} ---")
         print(f"\n--- Global Roster for CRN {crn} ---")
         if not students:
+            gui_print(label_info, "No students enrolled in this course.")
             print("No students enrolled in this course.")
         for s in students:
+            gui_print(label_info, f"{s[0]} {s[1]} ({s[2]})")
             print(f"{s[0]} {s[1]} ({s[2]})")
 
     def link_instructor(self, crn, instructor_id):
