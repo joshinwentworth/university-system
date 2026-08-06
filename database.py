@@ -2,16 +2,15 @@ import sqlite3
 import random
 
 database = sqlite3.connect("LeopardWeb_Data.db") 
-  
+
 cursor = database.cursor() 
-  
+
 sql_command = """CREATE TABLE IF NOT EXISTS LOGIN (  
 ID INTEGER PRIMARY KEY NOT NULL,
 EMAIL TEXT UNIQUE NOT NULL,
 PASSWORD TEXT NOT NULL,
 ROLE TEXT NOT NULL)
 ;"""
-  
 cursor.execute(sql_command) 
 
 sql_command = """CREATE TABLE IF NOT EXISTS ADMIN (  
@@ -71,6 +70,7 @@ FOREIGN KEY(CRN) REFERENCES COURSE(CRN))
 ;"""
 cursor.execute(sql_command) 
 
+
 admins = [
     (1000, 'Mark', 'Thompson', 'President', 'WIT', 'thompsonm@wit.edu'),
     (1001, 'Ali', 'Khabari', 'Dean', 'School of Engineering', 'khabaria@wit.edu'),
@@ -81,26 +81,35 @@ for admin_info in admins:
     cursor.execute(f"INSERT OR IGNORE INTO LOGIN VALUES({admin_info[0]}, '{admin_info[5]}', '{password}', 'Admin');")
     cursor.execute(f"INSERT OR IGNORE INTO ADMIN VALUES({admin_info[0]}, '{admin_info[1]}', '{admin_info[2]}', '{admin_info[3]}', '{admin_info[4]}', '{admin_info[5]}');")
 
+
 instructors = [
     ("Hayden", "Pierce"), ("Joey", "Cotta"), ("Jack", "Newton"), 
-    ("Mark", "Murphy"), ("Matt", "Muprhy"), ("Jon", "Savage"),
+    ("Mark", "Murphy"), ("Matt", "Murphy"), ("Jon", "Savage"),
     ("Dylan", "Brilliant"), ("Teddy", "Doyle"), ("Nate", "Lowe"), 
     ("Nate", "Bergquistguimond"), ("Ezra", "Blasko"), ("Everett", "Miller"),
     ("Ryan", "Ballard"), ("Evan", "McIntire"), ("Jacob", "Thomas")
 ]
 instructor_depts = ['BSCO', 'BSCO', 'BSEE', 'BSEE', 'COMP', 'COMP', 'ARCH', 'ARCH', 'CONM', 'CONM', 'MATH', 'MATH', 'PHYS', 'ENGL', 'ENGL']
 instructor_titles = ['Assistant Professor', 'Associate Professor', 'Professor']
-
 for user_id, (first_name, last_name) in enumerate(instructors, start=2000):
     dept = instructor_depts[user_id - 2000]
     title = random.choice(instructor_titles)
     hire_year = random.randint(1950, 2026)
-    email = f"{last_name.lower()}{first_name[0].lower()}@wit.edu"
+    base_prefix = f"{last_name.lower()}{first_name[0].lower()}"
+    email = f"{base_prefix}@wit.edu"
+    counter = 1
+    while True:
+        cursor.execute("SELECT EMAIL FROM LOGIN WHERE EMAIL = ?", (email,))
+        if not cursor.fetchone():
+            break
+        email = f"{base_prefix}{counter}@wit.edu"
+        counter += 1
     options = ["#", "!", "$"]
     symbol = random.choice(options)
     password = f"{first_name[0].upper()}{last_name[0].upper()}{dept.lower()}{hire_year%100}{symbol}"
     cursor.execute(f"INSERT OR IGNORE INTO LOGIN VALUES({user_id}, '{email}', '{password}', 'Instructor');")
     cursor.execute(f"INSERT OR IGNORE INTO INSTRUCTOR VALUES({user_id}, '{first_name}', '{last_name}', '{title}', {hire_year}, '{dept}', '{email}');")
+
 
 students = [
     ("Arman", "Kazemi"), ("Ashton", "Vallejo"), ("Beshoy", "Gawargi"), ("David", "Vozzo"),
@@ -110,16 +119,24 @@ students = [
     ("Lily", "Pattison"), ("Michael", "Sibert"), ("Robert", "Papazian"), ("Dillon", "Borowski")
 ]
 majors = ["BSCO", "BSEE", "COMP", "ARCH", "CONM"] * 4
-
 for user_id, (first_name, last_name) in enumerate(students, start=3000):
     major = majors[user_id - 3000]
     gradyear = random.randint(2026, 2030)
-    email = f"{last_name.lower()}{first_name[0].lower()}@student.wit.edu"
+    base_prefix = f"{last_name.lower()}{first_name[0].lower()}"
+    email = f"{base_prefix}@wit.edu"
+    counter = 1
+    while True:
+        cursor.execute("SELECT EMAIL FROM LOGIN WHERE EMAIL = ?", (email,))
+        if not cursor.fetchone():
+            break
+        email = f"{base_prefix}{counter}@wit.edu"
+        counter += 1
     options = ["#", "!", "$"]
     symbol = random.choice(options)
     password = f"{first_name[0].upper()}{last_name[0].upper()}{major.lower()}{gradyear%100}{symbol}"
     cursor.execute(f"INSERT OR IGNORE INTO LOGIN VALUES({user_id}, '{email}', '{password}', 'Student');")
     cursor.execute(f"INSERT OR IGNORE INTO STUDENT VALUES({user_id}, '{first_name}', '{last_name}', {gradyear}, '{major}', '{email}');")
+
 
 base_courses = [
     # BSCO
@@ -154,15 +171,14 @@ base_courses = [
     (18, "Calculus II", "MATH", "10", "MW", 4, 2011),
     (19, "Physics II", "PHYS", "13", "TR", 4, 2012)
 ]
-
 semesters = [("Summer", 2026, 100), ("Fall", 2026, 200), ("Spring", 2027, 300)]
 courses = []
 for sem_name, sem_year, offset in semesters:
     for c in base_courses:
         courses.append((c[0] + offset, c[1], c[2], c[3], c[4], sem_name, sem_year, c[5], c[6]))
-
 for course_info in courses:
     cursor.execute(f"INSERT OR IGNORE INTO COURSE VALUES({course_info[0]}, '{course_info[1]}', '{course_info[2]}', '{course_info[3]}', '{course_info[4]}', '{course_info[5]}', {course_info[6]}, {course_info[7]}, {course_info[8]});")
+
 
 print("Entire table")
 cursor.execute("""SELECT * FROM COURSE""")
@@ -172,5 +188,4 @@ for i in query_result:
 	print(i)
 
 database.commit() 
-
 database.close()

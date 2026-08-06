@@ -1,97 +1,87 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import sqlite3
 from logic import Student, Instructor, Admin, Course
-import pytest
 
-class university_system_app(tk.Tk):
+logged_in_user = None
+
+# setting up the main window and top menu
+class LeopardWebRegistrationApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Wentworth university system Simulator")
+        self.title("WIT LeopardWeb Registration System")
         
-        # Session state variables
+        menu_bar = tk.Menu(self)
+        self.config(menu=menu_bar)
+        
+        toolbar_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Toolbar", menu=toolbar_menu)
+        toolbar_menu.add_command(label="Help", command=self.show_help)
+        toolbar_menu.add_command(label="About", command=self.show_about)
+
         self.current_user = None
         self.user_role = None
-        self.user_balance = 0.0
-
-        # In-Memory Balance Cache
-        self.session_balances = {}
-        
+        self.user_id = None
         self.current_frame = None
         
-        # Launch directly into the login screen
         self.switch_frame(LoginFrame)
 
-    # Destroys the current frame, resizes the master window, and packs the new frame.
+    def show_help(self):
+        messagebox.showinfo("Help", "Enter your Wentworth email and password to log in.\nClick the function buttons to open specific prompts.\nParameter settings will appear once a function is selected\n\nAll information should be entered in the following format:\nDepartment or Major: BSCO, BSEE, COMP, ARCH, CONM, MATH, PHYS, ENGL\nTime: Military time in hours (e.g. 08 or 14)\nDays: MTWRF\nSemester: Fall, Spring, or Summer\nYear: 20XX\nCredits: If 3 credits... list as 1 or 3 days per week, If 4 credits... list as 1, 2, or 4 days per week\nInstructor Title: Professor, Associate Professor, or Assistant Professor")
+
+    def show_about(self):
+        messagebox.showinfo("About", "WIT LeopardWeb Registration System\nGroup Members: Hayden Pierce, Josh Kolasa")
+
+    # swap between login and whatever hub they need without making a new window
     def switch_frame(self, frame_class, *args, **kwargs):
         if self.current_frame is not None:
             self.current_frame.destroy()
             
-        # 1. Instantiate the new frame
         self.current_frame = frame_class(self, *args, **kwargs)
         
-        # 2. Apply the frame's preferred state (zoomed vs normal)
         if hasattr(self.current_frame, 'target_state'):
             self.state(self.current_frame.target_state)
         else:
             self.state('normal')
             
-        # 3. Apply the frame's preferred dimensions (if not zoomed)
         if hasattr(self.current_frame, 'target_geometry') and self.state() != 'zoomed':
             self.geometry(self.current_frame.target_geometry)
             
-        # 4. Pack the frame into the master window
         self.current_frame.pack(fill="both", expand=True)
-
-    def return_to_hub(self):
-        # Sync current balance to the runtime cache before swapping
-        if self.current_user:
-            self.session_balances[self.current_user] = self.user_balance
-            
-        if self.user_role == "Admin":
-            self.switch_frame(AdminHubFrame) 
-        else:
-            self.switch_frame(PlayerHubFrame)
 
 class LoginFrame(tk.Frame):
     target_state = 'normal'
-    target_geometry = '400x225'
+    target_geometry = '400x250'
 
     def __init__(self, master):
         super().__init__(master)
         self.master = master
         
-        # Username row
-        self.username_label = tk.Label(self, text="Username:")
+        self.username_label = tk.Label(self, text="Email:")
         self.username_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
         
         self.username_entry = tk.Entry(self, width=30)
         self.username_entry.grid(row=0, column=1, padx=10, pady=10)
         
-        # Password row
         self.password_label = tk.Label(self, text="Password:")
         self.password_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
         
         self.password_entry = tk.Entry(self, width=30, show="*")
         self.password_entry.grid(row=1, column=1, padx=10, pady=10)
         
-        # Login button
-        self.login_button = tk.Button(self, text="Login", command=self.login)
-        self.login_button.grid(row=2, column=0, columnspan=2, pady=15)
+        self.login_button = tk.Button(self, text="Login", command=self.login, width=15)
+        self.login_button.grid(row=2, column=0, columnspan=2, pady=10)
 
-        # Create Account Button
-        # self.create_acc_button = tk.Button(self, text="Create New Player", width=15, command=self.go_to_create_user)
-        # self.create_acc_button.grid(row=3, column=0, columnspan=2, pady=5)
+        self.forgot_btn = tk.Button(self, text="Forgot Password", command=self.forgot_password, width=15)
+        self.forgot_btn.grid(row=3, column=0, columnspan=2, pady=10)
         
-        # Bind enter key and set focus
         self.master.bind("<Return>", self.login)
         self.username_entry.focus()
 
+    # check db for user and build their specific object type
     def login(self, event=None):
         username = self.username_entry.get().strip()
         password = self.password_entry.get().strip() 
-        
-        # try:
         
         conn = sqlite3.connect("LeopardWeb_Data.db")
         cursor = conn.cursor()
@@ -99,76 +89,41 @@ class LoginFrame(tk.Frame):
         row = cursor.fetchone()
         conn.close()
 
-        print(row)
-        print(row[0])
-        print(row[2])
-
-    
-        if (row and row[0] == password)and(row[2] == username):
-            print("correct username and password")
-            # Store user data in master controller
+        if row and row[0] == password and row[2] == username:
             self.master.current_user = username
             self.master.user_role = row[1]
-
             self.master.user_id = row[3]
-            
-            # Check runtime cache. If new session, pull from DB. Otherwise, pull from cache.
-            if username not in self.master.session_balances:
-                self.master.session_balances[username] = row[2] # Pull DB starting balance
-                
-            self.master.user_balance = self.master.session_balances[username]
 
-            # Unbind the enter key so it doesn't trigger in other frames
             self.master.unbind("<Return>")
-
-            global loged_in_user
-
-            print(self.master.user_role)
+            global logged_in_user
             
-            # Route based on role
+            conn2 = sqlite3.connect("LeopardWeb_Data.db")
+            cursor2 = conn2.cursor()
+            
+            # map them to the correct dashboard based on role
             if self.master.user_role == "Admin":
-                #creates the class
-                conn2 = sqlite3.connect("LeopardWeb_Data.db")
-                cursor2 = conn2.cursor()
                 cursor2.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, TITLE, OFFICE FROM ADMIN WHERE ID = ?", (self.master.user_id,))
                 data = cursor2.fetchone()
-
-                loged_in_user = Admin(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4])
+                logged_in_user = Admin(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4])
                 self.master.switch_frame(AdminHubFrame)
-            elif (self.master.user_role == "Student"):
-                #creates the class
-                conn2 = sqlite3.connect("LeopardWeb_Data.db")
-                cursor2 = conn2.cursor()
+            elif self.master.user_role == "Student":
                 cursor2.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, GRADYEAR, MAJOR FROM STUDENT WHERE ID = ?", (self.master.user_id,))
                 data = cursor2.fetchone()
-
-                loged_in_user = Student(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4])
+                logged_in_user = Student(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4])
                 self.master.switch_frame(StudentHubFrame)
-            elif (self.master.user_role == "Instructor"):
-                print("creating Instructor the class")
-                #creates the class
-                conn2 = sqlite3.connect("LeopardWeb_Data.db")
-                cursor2 = conn2.cursor()
+            elif self.master.user_role == "Instructor":
                 cursor2.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, TITLE, HIREYEAR, DEPT FROM INSTRUCTOR WHERE ID = ?", (self.master.user_id,))
                 data = cursor2.fetchone()
-                loged_in_user = Instructor(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4], data[5])
-                self.master.switch_frame(InstructerHubFrame)
+                logged_in_user = Instructor(conn2, self.master.user_id, data[0], data[1], data[2], data[3], data[4], data[5])
+                self.master.switch_frame(InstructorHubFrame)
                 
         else:
-            messagebox.showerror("Login Failed", "Incorrect username and/or password.")
+            messagebox.showerror("Login Failed", "Incorrect email or password.")
             self.password_entry.delete(0, tk.END)
             self.password_entry.focus()
-                
-        # except sqlite3.OperationalError:
-        #     messagebox.showerror("Database Error", "Casino_Data.db not found! Run your DB script first.")
 
-    def go_to_create_user(self):
-        self.master.unbind("<Return>")
-        self.master.switch_frame(CreateUserFrame)
-
-def get_param(username_entry):
-    return username_entry.get().strip()
-
+    def forgot_password(self):
+        messagebox.showinfo("Reset Password", "Please contact admin to reset your password.")
 
 class StudentHubFrame(ttk.Frame): 
     target_state = 'zoomed'
@@ -178,64 +133,153 @@ class StudentHubFrame(ttk.Frame):
         self.master = master
         self.create_gui()
 
+    # set up the buttons on the left and the big output window on the right
     def create_gui(self):
-        # Welcome Header
         welcome_frame = ttk.Frame(self)
         welcome_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(welcome_frame, text=f"Welcome {self.master.current_user}!", font=("Arial", 18, "bold")).pack()
+        ttk.Label(welcome_frame, text=f"Welcome {logged_in_user.first_name} {logged_in_user.last_name}!", font=("Arial", 18, "bold")).pack()
         ttk.Label(welcome_frame, text="Select a function below", font=("Arial", 12)).pack()
 
-        # Balance display
-        # balance_frame = ttk.Frame(self)
-        # balance_frame.pack(fill=tk.X, pady=(0, 15))
-        # ttk.Label(balance_frame, text=f"Current Balance: ${self.master.user_balance:,.2f}", font=("Arial", 16, "bold")).pack()
-
-        # Buttons Grid
-        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=200)
-        Buttons_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
+        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=250)
+        Buttons_frame.pack(side=tk.LEFT, fill=tk.Y, expand=False, pady=10)
         Buttons_frame.pack_propagate(False)
 
-        # Results Grid
-        Results_frame = ttk.LabelFrame(self, text="Text", padding=15)
-        Results_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
+        Results_frame = ttk.LabelFrame(self, text="System Output", padding=15)
+        Results_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=10, padx=(10, 0))
 
-
-        label_info = tk.Label(Results_frame, text="                                                              ", font=("Arial", 11, "bold"), fg="black")
-        label_info.pack()
-
-        #entry field
-        username_label = tk.Label(Buttons_frame, text="Parameter:")
-        username_label.grid(row=5, column=0, padx=100, pady=10, sticky="e")
+        self.label_info = tk.Text(Results_frame, wrap=tk.WORD, font=("Consolas", 10), state="disabled", bg="#f9f9f9")
+        scrollbar = ttk.Scrollbar(Results_frame, command=self.label_info.yview)
+        self.label_info.config(yscrollcommand=scrollbar.set)
         
-        username_entry = tk.Entry(Buttons_frame, width=30)
-        username_entry.grid(row=6, column=0, padx=10, pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.label_info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        #functions button
-        ttk.Button(Buttons_frame, text="Search all courses", command=lambda: loged_in_user.search_courses(label_info)).grid(row=0, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        #some of the button needs to be a varable for some reason
-        button1 = ttk.Button(Buttons_frame, text="Search courses by parameters", command=lambda: loged_in_user.search_courses(label_info, get_param(username_entry)))
-        button1.grid(row=1, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        button2 = ttk.Button(Buttons_frame, text="Add course to schedule", command=lambda: loged_in_user.add_course(label_info, get_param(username_entry)))
-        button2.grid(row=2, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        button3 = ttk.Button(Buttons_frame, text="Remove course from schedule", command=lambda: loged_in_user.remove_course(label_info, get_param(username_entry)))
-        button3.grid(row=3, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Print schedule", command=lambda: loged_in_user.print_schedule(label_info)).grid(row=4, column=0, padx=15, pady=12, ipadx=10, ipady=8)
+        self.label_info.tag_configure("title", font=("Consolas", 11, "bold"), foreground="#003366")
+        self.label_info.tag_configure("error", font=("Consolas", 10, "bold"), foreground="#cc0000")
 
+        ttk.Button(Buttons_frame, text="Search All Courses", command=lambda: logged_in_user.search_courses(self.label_info)).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Search Courses by Param", command=self.search_param_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Add Course to Schedule", command=self.add_course_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Remove Course from Schedule", command=self.remove_course_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Print Schedule", command=lambda: logged_in_user.print_schedule(self.label_info)).pack(fill=tk.X, pady=5)
 
-        # Logout Button
-        ttk.Button(self, text="Logout", command=self.logout).pack(side="bottom", pady=20)
+        ttk.Button(Buttons_frame, text="Logout", command=self.logout).pack(side=tk.BOTTOM, fill=tk.X, pady=20)
 
+    def search_param_action(self):
+        param = simpledialog.askstring("Search Courses", "          Enter search keyword (Title or Dept):          ")
+        if param is not None:
+            param_clean = param.strip()
+            if param_clean:
+                logged_in_user.search_courses(self.label_info, param_clean)
+            else:
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+
+    def add_course_action(self):
+        crn_str = simpledialog.askstring("Add Course", "Enter the CRN to add:")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                logged_in_user.add_course(self.label_info, int(crn_clean))
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
+
+    def remove_course_action(self):
+        crn_str = simpledialog.askstring("Remove Course", "Enter the CRN to remove:")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                logged_in_user.remove_course(self.label_info, int(crn_clean))
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
 
     def logout(self):
-        # Sync to cache before logging out
-        if self.master.current_user:
-            self.master.session_balances[self.master.current_user] = self.master.user_balance
-            
         self.master.current_user = None
-        self.master.user_balance = 0.0
         self.master.switch_frame(LoginFrame)
 
+class InstructorHubFrame(ttk.Frame): 
+    target_state = 'zoomed'
+
+    def __init__(self, master):
+        super().__init__(master, padding=20)
+        self.master = master
+        self.create_gui()
+
+    def create_gui(self):
+        welcome_frame = ttk.Frame(self)
+        welcome_frame.pack(fill=tk.X, pady=(0, 20))
+        ttk.Label(welcome_frame, text=f"Welcome {logged_in_user.first_name} {logged_in_user.last_name}!", font=("Arial", 18, "bold")).pack()
+        ttk.Label(welcome_frame, text="Select a function below", font=("Arial", 12)).pack()
+
+        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=250)
+        Buttons_frame.pack(side=tk.LEFT, fill=tk.Y, expand=False, pady=10)
+        Buttons_frame.pack_propagate(False)
+
+        Results_frame = ttk.LabelFrame(self, text="System Output", padding=15)
+        Results_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=10, padx=(10, 0))
+
+        self.label_info = tk.Text(Results_frame, wrap=tk.WORD, font=("Consolas", 10), state="disabled", bg="#f9f9f9")
+        scrollbar = ttk.Scrollbar(Results_frame, command=self.label_info.yview)
+        self.label_info.config(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.label_info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.label_info.tag_configure("title", font=("Consolas", 11, "bold"), foreground="#003366")
+        self.label_info.tag_configure("error", font=("Consolas", 10, "bold"), foreground="#cc0000")
+
+        ttk.Button(Buttons_frame, text="Search All Courses", command=lambda: logged_in_user.search_courses(self.label_info)).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Search Courses by Param", command=self.search_param_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Print Teaching Schedule", command=lambda: logged_in_user.print_teaching_schedule(self.label_info)).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Print Course Roster", command=self.print_roster_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Search Course Roster", command=self.search_roster_action).pack(fill=tk.X, pady=5)
+
+        ttk.Button(Buttons_frame, text="Logout", command=self.logout).pack(side=tk.BOTTOM, fill=tk.X, pady=20)
+
+    def search_param_action(self):
+        param = simpledialog.askstring("Search Courses", "          Enter search keyword (Title or Dept):          ")
+        if param is not None:
+            param_clean = param.strip()
+            if param_clean:
+                logged_in_user.search_courses(self.label_info, param_clean)
+            else:
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+
+    def print_roster_action(self):
+        crn_str = simpledialog.askstring("Print Roster", "                         Enter the CRN:                         ")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                logged_in_user.print_roster(self.label_info, int(crn_clean))
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
+
+    def search_roster_action(self):
+        crn_str = simpledialog.askstring("Search Roster", "                         Enter the CRN:                         ")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                self.master.update()
+                keyword = simpledialog.askstring("Search Roster", "          Enter student's first or last name:          ")
+                if keyword is not None:
+                    key_clean = keyword.strip()
+                    if key_clean:
+                        logged_in_user.search_roster(self.label_info, int(crn_clean), key_clean)
+                    else:
+                        messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
+
+    def logout(self):
+        self.master.current_user = None
+        self.master.switch_frame(LoginFrame)
 
 class AdminHubFrame(ttk.Frame): 
     target_state = 'zoomed'
@@ -246,332 +290,314 @@ class AdminHubFrame(ttk.Frame):
         self.create_gui()
 
     def create_gui(self):
-        # Welcome Header
         welcome_frame = ttk.Frame(self)
         welcome_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(welcome_frame, text=f"Welcome {self.master.current_user}!", font=("Arial", 18, "bold")).pack()
+        ttk.Label(welcome_frame, text=f"Welcome {logged_in_user.first_name} {logged_in_user.last_name}!", font=("Arial", 18, "bold")).pack()
         ttk.Label(welcome_frame, text="Select a function below", font=("Arial", 12)).pack()
 
-        # Balance display
-        # balance_frame = ttk.Frame(self)
-        # balance_frame.pack(fill=tk.X, pady=(0, 15))
-        # ttk.Label(balance_frame, text=f"Current Balance: ${self.master.user_balance:,.2f}", font=("Arial", 16, "bold")).pack()
-
-        # Buttons Grid
-        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=200)
-        Buttons_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
+        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=250)
+        Buttons_frame.pack(side=tk.LEFT, fill=tk.Y, expand=False, pady=10)
         Buttons_frame.pack_propagate(False)
 
-        # Results Grid
-        Results_frame = ttk.LabelFrame(self, text="Text", padding=15)
-        Results_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
+        Results_frame = ttk.LabelFrame(self, text="System Output", padding=15)
+        Results_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=10, padx=(10, 0))
 
-
-        label_info = tk.Label(Results_frame, text="                                                              ", font=("Arial", 11, "bold"), fg="black")
-        label_info.pack()
-
+        self.label_info = tk.Text(Results_frame, wrap=tk.WORD, font=("Consolas", 10), state="disabled", bg="#f9f9f9")
+        scrollbar = ttk.Scrollbar(Results_frame, command=self.label_info.yview)
+        self.label_info.config(yscrollcommand=scrollbar.set)
         
-        #entry field
-        username_label = tk.Label(Buttons_frame, text="Parameter:")
-        username_label.grid(row=7, column=0, padx=100, pady=10, sticky="e")
-        
-        username_entry = tk.Entry(Buttons_frame, width=30)
-        username_entry.grid(row=8, column=0, padx=10, pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.label_info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        #functions button
-        ttk.Button(Buttons_frame, text="Search all courses", command=lambda: loged_in_user.search_courses(label_info)).grid(row=0, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        button1 = ttk.Button(Buttons_frame, text="Search courses by parameters", command=lambda: loged_in_user.search_courses(label_info, get_param(username_entry)))
-        button1.grid(row=1, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        # there is a lot of inputs here I will come back to the rest of admin latter
-        ttk.Button(Buttons_frame, text="Print course roster", command=lambda: loged_in_user.print_roster(label_info, get_param(username_entry))).grid(row=2, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Add new course", command=lambda: test_print(label_info)).grid(row=3, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Link/unlink instructor to course", command=lambda: test_print(label_info)).grid(row=4, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Link/unlink student to course", command=lambda: test_print(label_info)).grid(row=5, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Add new user", command=lambda: test_print(label_info)).grid(row=6, column=0, padx=15, pady=12, ipadx=10, ipady=8)
+        self.label_info.tag_configure("title", font=("Consolas", 11, "bold"), foreground="#003366")
+        self.label_info.tag_configure("error", font=("Consolas", 10, "bold"), foreground="#cc0000")
 
+        ttk.Button(Buttons_frame, text="Search All Courses", command=lambda: logged_in_user.search_courses(self.label_info)).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Search Courses by Param", command=self.search_param_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Print Course Roster", command=self.print_roster_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Search Course Roster", command=self.search_roster_action).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Add New Course", command=self.add_course_popup).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Link/Unlink Instructor", command=self.link_instructor_popup).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Link/Unlink Student", command=self.link_student_popup).pack(fill=tk.X, pady=5)
+        ttk.Button(Buttons_frame, text="Add New User", command=self.add_user_popup).pack(fill=tk.X, pady=5)
 
-        # Logout Button
-        ttk.Button(self, text="Logout", command=self.logout).pack(side="bottom", pady=20)
+        ttk.Button(Buttons_frame, text="Logout", command=self.logout).pack(side=tk.BOTTOM, fill=tk.X, pady=20)
 
-    def logout(self):
-        # Sync to cache before logging out
-        if self.master.current_user:
-            self.master.session_balances[self.master.current_user] = self.master.user_balance
-            
-        self.master.current_user = None
-        self.master.user_balance = 0.0
-        self.master.switch_frame(LoginFrame)
-
-
-class InstructerHubFrame(ttk.Frame): 
-    target_state = 'zoomed'
-
-    def __init__(self, master):
-        super().__init__(master, padding=20)
-        self.master = master
-        self.create_gui()
-
-    def create_gui(self):
-        # Welcome Header
-        welcome_frame = ttk.Frame(self)
-        welcome_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(welcome_frame, text=f"Welcome {self.master.current_user}!", font=("Arial", 18, "bold")).pack()
-        ttk.Label(welcome_frame, text="Select a function below", font=("Arial", 12)).pack()
-
-        # Balance display
-        # balance_frame = ttk.Frame(self)
-        # balance_frame.pack(fill=tk.X, pady=(0, 15))
-        # ttk.Label(balance_frame, text=f"Current Balance: ${self.master.user_balance:,.2f}", font=("Arial", 16, "bold")).pack()
-
-        # Buttons Grid
-        Buttons_frame = ttk.LabelFrame(self, text="Functions", padding=15, width=200)
-        Buttons_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
-        Buttons_frame.pack_propagate(False)
-
-        # Results Grid
-        Results_frame = ttk.LabelFrame(self, text="Text", padding=15)
-        Results_frame.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=10)
-
-
-        label_info = tk.Label(Results_frame, text="                                                              ", font=("Arial", 8, "bold"), fg="black")
-        label_info.pack(anchor='n')
-
-        #entry field
-        username_label = tk.Label(Buttons_frame, text="Parameter:")
-        username_label.grid(row=5, column=0, padx=100, pady=10, sticky="e")
-        
-        username_entry = tk.Entry(Buttons_frame, width=30)
-        username_entry.grid(row=6, column=0, padx=10, pady=10)
-
-        #functions button
-        ttk.Button(Buttons_frame, text="Search all courses", command=lambda: loged_in_user.search_courses(label_info)).grid(row=0, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        button1 = ttk.Button(Buttons_frame, text="Search courses by parameters", command=lambda: loged_in_user.search_courses(label_info, get_param(username_entry)))
-        button1.grid(row=1, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        ttk.Button(Buttons_frame, text="Print teaching sechedule", command=lambda: loged_in_user.print_teaching_schedule(label_info)).grid(row=2, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        #skiped for now
-        ttk.Button(Buttons_frame, text="search course roster for student", command=lambda: test_print(label_info)).grid(row=3, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-        button3 = ttk.Button(Buttons_frame, text="Print course roster", command=lambda: loged_in_user.print_roster(label_info, get_param(username_entry)))
-        button3.grid(row=4, column=0, padx=15, pady=12, ipadx=10, ipady=8)
-
-
-
-        # Logout Button
-        ttk.Button(self, text="Logout", command=self.logout).pack(side="bottom", pady=20)
-
-    def logout(self):
-        # Sync to cache before logging out
-        if self.master.current_user:
-            self.master.session_balances[self.master.current_user] = self.master.user_balance
-            
-        self.master.current_user = None
-        self.master.user_balance = 0.0
-        self.master.switch_frame(LoginFrame)
-
-def test_print(label_info):
-    current_text = label_info.cget("text")
-    label_info.config(text = " \n" + current_text)
-    current_text = label_info.cget("text")
-    label_info.config(text = "test" + current_text)
-
-# I put this function in logic.py as well
-def gui_print(label_info, text_to_be_printed):
-    current_text = label_info.cget("text")
-    label_info.config(text = " \n" + current_text)
-    current_text = label_info.cget("text")
-    label_info.config(text = text_to_be_printed + current_text)
-
-# Not used for gui
-def login(conn):
-    cursor = conn.cursor()
-    print("Welcome to LeopardWeb Registration System!")
-    email = input("Email: ")
-    password = input("Password: ")
-
-    cursor.execute("SELECT ID, ROLE FROM LOGIN WHERE EMAIL = ? AND PASSWORD = ?", (email, password))
-    user_data = cursor.fetchone()
-
-    if not user_data:
-        print("Invalid credentials.")
-        return None, None
-
-    user_id, role = user_data
-
-    if role == 'Student':
-        cursor.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, GRADYEAR, MAJOR FROM STUDENT WHERE ID = ?", (user_id,))
-        data = cursor.fetchone()
-        return Student(conn, user_id, data[0], data[1], data[2], data[3], data[4]), role
-    elif role == 'Instructor':
-        cursor.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, TITLE, HIREYEAR, DEPT FROM INSTRUCTOR WHERE ID = ?", (user_id,))
-        data = cursor.fetchone()
-        return Instructor(conn, user_id, data[0], data[1], data[2], data[3], data[4], data[5]), role
-    elif role == 'Admin':
-        cursor.execute("SELECT FIRST_NAME, LAST_NAME, EMAIL, TITLE, OFFICE FROM ADMIN WHERE ID = ?", (user_id,))
-        data = cursor.fetchone()
-        return Admin(conn, user_id, data[0], data[1], data[2], data[3], data[4]), role
-    
-
-def student_menu(user):
-    while True:
-        print(f"\nStudent Menu: Hello {user.first_name} {user.last_name}...")
-        print("1. Search all courses")
-        print("2. Search courses by parameters")
-        print("3. Add course to schedule")
-        print("4. Remove course from schedule")
-        print("5. Print schedule")
-        print("6. Logout")
-        
-        choice = input("Select an option: ")
-        
-        if choice == '1':
-            user.search_courses()
-        elif choice == '2':
-            param = input("Enter search keyword (Title or Dept): ")
-            user.search_courses(param)
-        elif choice == '3':
-            crn = int(input("Enter CRN to add: "))
-            user.add_course(crn)
-        elif choice == '4':
-            crn = int(input("Enter CRN to remove: "))
-            user.remove_course(crn)
-        elif choice == '5':
-            user.print_schedule()
-        elif choice == '6':
-            print("Logging out...")
-            break
-
-def instructor_menu(user):
-    while True:
-        print(f"\nInstructor Menu: Hello {user.first_name} {user.last_name}...")
-        print("1. Search all courses")
-        print("2. Search courses by parameters")
-        print("3. Print teaching schedule")
-        print("4. Search course roster for specific student")
-        print("5. Print general course roster")
-        print("6. Logout")
-        
-        choice = input("Select an option: ")
-        
-        if choice == '1':
-            user.search_courses()
-        elif choice == '2':
-            param = input("Enter search keyword (Title or Dept): ")
-            user.search_courses(param)
-        elif choice == '3':
-            user.print_teaching_schedule()
-        elif choice == '4':
-            crn = int(input("Enter CRN to search within: "))
-            search_keyword = input("Enter student's first or last name to search: ")
-            user.search_roster(crn, search_keyword)
-        elif choice == '5':
-            crn = int(input("Enter CRN to view entire roster: "))
-            user.print_roster(crn)
-        elif choice == '6':
-            print("Logging out...")
-            break
-
-def admin_menu(user):
-    while True:
-        print(f"\nAdmin Menu: Hello {user.first_name} {user.last_name}...")
-        print("1. Search all courses")
-        print("2. Search courses by parameters")
-        print("3. Print course roster")
-        print("4. Add new course")
-        print("5. Link/Unlink instructor to course")
-        print("6. Add/Remove student from course")
-        print("7. Add new user (Student/Instructor) to system")
-        print("8. Logout")
-        
-        choice = input("Select an option: ")
-        
-        if choice == '1':
-            user.search_courses()
-        elif choice == '2':
-            param = input("Enter search keyword (Title or Dept): ")
-            user.search_courses(param)
-        elif choice == '3':
-            crn = int(input("Enter CRN to view roster: "))
-            user.print_roster(crn)
-        elif choice == '4':
-            crn = int(input("CRN: "))
-            title = input("Title: ")
-            dept = input("Department: ")
-            time = input("Time hour (e.g., 14): ")
-            days = input("Days (e.g., MW or TR): ")
-            sem = input("Semester: ")
-            year = int(input("Year: "))
-            cred = int(input("Credits: "))
-            inst_input = input("Instructor ID (or leave blank): ")
-            inst_id = int(inst_input) if inst_input.strip() else None
-            
-            new_course = Course(crn, title, dept, time, days, sem, year, cred, inst_id)
-            user.add_course(new_course)
-        elif choice == '5':
-            crn = int(input("Enter CRN: "))
-            inst_input = input("Enter new Instructor ID (leave blank to unlink): ")
-            inst_id = int(inst_input) if inst_input.strip() else None
-            user.link_instructor(crn, inst_id)
-        elif choice == '6':
-            action = input("Type 'add' or 'remove': ").lower()
-            if action in ['add', 'remove']:
-                student_id = int(input("Student ID: "))
-                crn = int(input("CRN: "))
-                user.manage_student_enrollment(student_id, crn, action)
-        elif choice == '7':
-            print("\n--- Add New User ---")
-            role = input("Role (Student/Instructor): ").capitalize()
-            if role in ['Student', 'Instructor']:
-                first_name = input("First Name: ")
-                last_name = input("Last Name: ")
-                email = input("Email: ")
-                password = input("Password: ")
-                
-                if role == 'Student':
-                    grad_year = int(input("Expected Graduation Year: "))
-                    major = input("Major (e.g., BSCO): ")
-                    user.add_user(role, first_name, last_name, email, password, grad_year=grad_year, major=major)
-                elif role == 'Instructor':
-                    title = input("Title (e.g., Prof, Assistant Prof): ")
-                    hire_year = int(input("Hire Year: "))
-                    dept = input("Department (e.g., BCOS): ")
-                    user.add_user(role, first_name, last_name, email, password, title=title, hire_year=hire_year, dept=dept)
+    def search_param_action(self):
+        param = simpledialog.askstring("Search Courses", "          Enter search keyword (Title or Dept):          ")
+        if param is not None:
+            param_clean = param.strip()
+            if param_clean:
+                logged_in_user.search_courses(self.label_info, param_clean)
             else:
-                print("Invalid role selected. Must be 'Student' or 'Instructor'.")
-        elif choice == '8':
-            print("Logging out...")
-            break
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
 
-def main():
-    conn = sqlite3.connect("LeopardWeb_Data.db")
-    
-    while True:
-        user_obj, role = login(conn)
-        if user_obj:
-            if role == 'Student':
-                student_menu(user_obj)
-            elif role == 'Instructor':
-                instructor_menu(user_obj)
-            elif role == 'Admin':
-                admin_menu(user_obj)
+    def print_roster_action(self):
+        crn_str = simpledialog.askstring("Print Roster", "                         Enter the CRN:                         ")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                logged_in_user.print_roster(self.label_info, int(crn_clean))
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
+
+    def search_roster_action(self):
+        crn_str = simpledialog.askstring("Search Roster", "                         Enter the CRN:                         ")
+        if crn_str is not None:
+            crn_clean = crn_str.strip()
+            if crn_clean.isdigit():
+                self.master.update()
+                keyword = simpledialog.askstring("Search Roster", "          Enter student's first or last name:          ")
+                if keyword is not None:
+                    key_clean = keyword.strip()
+                    if key_clean:
+                        logged_in_user.search_roster(self.label_info, int(crn_clean), key_clean)
+                    else:
+                        messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            elif crn_clean == "":
+                messagebox.showwarning("Invalid Input", "Parameter cannot be left blank.")
+            else:
+                messagebox.showerror("Invalid Input", "CRN must be a valid numeric integer.")
+
+    # building custom popup for adding a course
+    def add_course_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Add New Course")
+        popup.geometry("320x350")
+        popup.grab_set() 
         
-        cont = input("\nNew login? (y/n): ").lower()
-        if cont != 'y':
-            break
+        entries = {}
+        fields = ["CRN", "Title", "Department", "Time", "Days", "Semester", "Year", "Credits", "Instructor ID (Optional)"]
+        
+        for i, field in enumerate(fields):
+            tk.Label(popup, text=field + ":").grid(row=i, column=0, padx=10, pady=5, sticky="e")
+            ent = tk.Entry(popup)
+            ent.grid(row=i, column=1, padx=10, pady=5)
+            entries[field] = ent
+            
+        def submit():
+            try:
+                title = entries["Title"].get().strip().title()
+                dept = entries["Department"].get().strip().upper()
+                time = entries["Time"].get().strip()
+                days = entries["Days"].get().strip().upper()
+                sem = entries["Semester"].get().strip().capitalize()
+                
+                if not all([title, dept, time, days, sem]):
+                    messagebox.showwarning("Missing Information", "Please complete all required fields before submitting.", parent=popup)
+                    return
+                
+                crn = int(entries["CRN"].get())
+                
+                # check if CRN already exists
+                conn = sqlite3.connect("LeopardWeb_Data.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT CRN FROM COURSE WHERE CRN = ?", (crn,))
+                if cursor.fetchone():
+                    messagebox.showerror("Duplicate Entry", f"CRN {crn} is already assigned to an existing course.", parent=popup)
+                    conn.close()
+                    return
+                conn.close()
+                
+                year = int(entries["Year"].get())
+                cred = int(entries["Credits"].get())
+                inst_val = entries["Instructor ID (Optional)"].get().strip()
+                inst_id = int(inst_val) if inst_val else None
+                
+                new_course = Course(crn, title, dept, time, days, sem, year, cred, inst_id)
+                logged_in_user.add_course(self.label_info, new_course)
+                popup.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Data Type", "CRN, Time (hour), Year, and Credits must be numbers.", parent=popup)
+                
+        tk.Button(popup, text="Submit", command=submit).grid(row=len(fields), column=0, columnspan=2, pady=15)
 
-    conn.close()
-    print("Exiting LeopardWeb. Thank you for using our program.")
+    def link_instructor_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Link/UnLink")
+        popup.grab_set()
+        
+        tk.Label(popup, text="Instructor ID:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
+        inst_ent = tk.Entry(popup)
+        inst_ent.grid(row=0, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="CRN:").grid(row=1, column=0, padx=10, pady=5, sticky="e")
+        crn_ent = tk.Entry(popup)
+        crn_ent.grid(row=1, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Action (add/remove):").grid(row=2, column=0, padx=10, pady=5, sticky="e")
+        act_ent = tk.Entry(popup)
+        act_ent.grid(row=2, column=1, padx=10, pady=5)
+        
+        def submit():
+            inst_str = inst_ent.get().strip()
+            crn_str = crn_ent.get().strip()
+            action = act_ent.get().strip().lower()
 
-# if __name__ == "__main__":
-#     main()
+            if not all([crn_str, action]):
+                messagebox.showwarning("Missing Information", "Please complete all required fields before submitting.", parent=popup)
+                return
+            
+            if action not in ["add", "remove"]:
+                messagebox.showerror("Invalid Input", "Action must be add or remove.", parent=popup)
+                return
+            
+            if not crn_str.isdigit():
+                messagebox.showerror("Invalid Data Type", "IDs and CRNs must be valid numbers.", parent=popup)
+                return
+            
+            inst_id = int(inst_str) if inst_str.isdigit() else None
+            
+            if action == "add" and inst_id is None:
+                messagebox.showerror("Invalid Data Type", "IDs and CRNs must be valid numbers.", parent=popup)
+                return
+            
+            logged_in_user.link_instructor(self.label_info, inst_id, int(crn_str), action)
+            popup.destroy()
+            
+        tk.Button(popup, text="Submit", command=submit).grid(row=3, column=0, columnspan=2, pady=15)
 
+    def link_student_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Link/UnLink")
+        popup.grab_set()
+        
+        tk.Label(popup, text="Student ID:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
+        stu_ent = tk.Entry(popup)
+        stu_ent.grid(row=0, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="CRN:").grid(row=1, column=0, padx=10, pady=5, sticky="e")
+        crn_ent = tk.Entry(popup)
+        crn_ent.grid(row=1, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Action (add/remove):").grid(row=2, column=0, padx=10, pady=5, sticky="e")
+        act_ent = tk.Entry(popup)
+        act_ent.grid(row=2, column=1, padx=10, pady=5)
+        
+        def submit():
+            stu_str = stu_ent.get().strip()
+            crn_str = crn_ent.get().strip()
+            action = act_ent.get().strip().lower()
 
-# def test_something_that_involves_user_input(main):
+            if not all([stu_str, crn_str, action]):
+                messagebox.showwarning("Missing Information", "Please complete all required fields before submitting.", parent=popup)
+                return
 
-#     main.setattr('builtins.input', lambda _: "Mark")
-#     email = input("Email: ")
-#     assert email == "Mark"
+            if action not in ["add", "remove"]:
+                messagebox.showerror("Invalid Input", "Action must be add or remove.", parent=popup)
+                return
+
+            if not stu_str.isdigit() or not crn_str.isdigit():
+                messagebox.showerror("Invalid Data Type", "IDs and CRNs must be valid numbers.", parent=popup)
+                return
+            
+            logged_in_user.manage_student_enrollment(self.label_info, int(stu_str), int(crn_str), action)
+            popup.destroy()
+            
+        tk.Button(popup, text="Submit", command=submit).grid(row=3, column=0, columnspan=2, pady=15)
+
+    def add_user_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Add New User")
+        popup.grab_set()
+        
+        tk.Label(popup, text="Role:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
+        role_ent = tk.Entry(popup)
+        role_ent.grid(row=0, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="First Name:").grid(row=1, column=0, padx=10, pady=5, sticky="e")
+        fn_ent = tk.Entry(popup)
+        fn_ent.grid(row=1, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Last Name:").grid(row=2, column=0, padx=10, pady=5, sticky="e")
+        ln_ent = tk.Entry(popup)
+        ln_ent.grid(row=2, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Expected Grad Year (Student):").grid(row=3, column=0, padx=10, pady=5, sticky="e")
+        gy_ent = tk.Entry(popup)
+        gy_ent.grid(row=3, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Major (Student, e.g., BSCO):").grid(row=4, column=0, padx=10, pady=5, sticky="e")
+        maj_ent = tk.Entry(popup)
+        maj_ent.grid(row=4, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Title (Instructor, e.g., Prof):").grid(row=5, column=0, padx=10, pady=5, sticky="e")
+        title_ent = tk.Entry(popup)
+        title_ent.grid(row=5, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Hire Year (Instructor):").grid(row=6, column=0, padx=10, pady=5, sticky="e")
+        hy_ent = tk.Entry(popup)
+        hy_ent.grid(row=6, column=1, padx=10, pady=5)
+        
+        tk.Label(popup, text="Department (Instructor):").grid(row=7, column=0, padx=10, pady=5, sticky="e")
+        dept_ent = tk.Entry(popup)
+        dept_ent.grid(row=7, column=1, padx=10, pady=5)
+        
+        def submit():
+            role = role_ent.get().strip().capitalize()
+            fn = fn_ent.get().strip().capitalize()
+            ln = ln_ent.get().strip().capitalize()
+            
+            if role not in ["Student", "Instructor"]:
+                messagebox.showerror("Invalid Input", "Role must be Student or Instructor.", parent=popup)
+                return
+            
+            try:
+                # auto-gen unique emails by checking the db in a loop
+                base_prefix = f"{ln.lower()}{fn[0].lower()}"
+                email = f"{base_prefix}@wit.edu"
+                counter = 1
+                
+                conn = sqlite3.connect("LeopardWeb_Data.db")
+                cursor = conn.cursor()
+                while True:
+                    cursor.execute("SELECT EMAIL FROM LOGIN WHERE EMAIL = ?", (email,))
+                    if not cursor.fetchone():
+                        break # if slot is empty, break out of loop
+                    
+                    email = f"{base_prefix}{counter}@wit.edu" # if slot is taken, add counter and check again
+                    counter += 1
+                conn.close()
+                
+                if role == "Student":
+                    gy_str = gy_ent.get().strip()
+                    maj = maj_ent.get().strip().upper()
+                    
+                    if not all([fn, ln, gy_str, maj]):
+                        messagebox.showwarning("Missing Information", "Please complete all required fields before submitting.", parent=popup)
+                        return
+                    
+                    gy = int(gy_str)
+                    pw = f"{fn[0]}{ln[0]}{maj.lower()}{gy % 100}!"
+                    
+                    logged_in_user.add_user(self.label_info, role, fn, ln, email, pw, grad_year=gy, major=maj)
+                
+                else:
+                    hy_str = hy_ent.get().strip()
+                    title = title_ent.get().strip().title()
+                    dept = dept_ent.get().strip().upper()
+                    
+                    if not all([fn, ln, hy_str, title, dept]):
+                        messagebox.showwarning("Missing Information", "Please complete all required fields before submitting.", parent=popup)
+                        return
+                        
+                    hy = int(hy_str)
+                    pw = f"{fn[0]}{ln[0]}{dept.lower()}{hy % 100}!"
+                    
+                    logged_in_user.add_user(self.label_info, role, fn, ln, email, pw, title=title, hire_year=hy, dept=dept)
+                
+                popup.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Data Type", "Graduation Year / Hire Year must be a valid number.", parent=popup)
+                
+        tk.Button(popup, text="Submit", command=submit).grid(row=8, column=0, columnspan=2, pady=15)
+
+    def logout(self):
+        self.master.current_user = None
+        self.master.switch_frame(LoginFrame)
 
 if __name__ == "__main__":
-    app = university_system_app()
+    app = LeopardWebRegistrationApp()
     app.mainloop()
