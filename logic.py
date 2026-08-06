@@ -42,7 +42,7 @@ class User:
 
     # grabbing all courses or just the ones that match the search parameter
     def search_courses(self, label_info, param=None):
-        print("pram in search_courses: "+str(param))
+        print("Parameter in search_courses: "+str(param))
 
         if param:
             self.cursor.execute("SELECT * FROM COURSE WHERE TITLE LIKE ? OR DEPARTMENT LIKE ?", (f'%{param}%', f'%{param}%'))
