@@ -529,11 +529,11 @@ class AdminHubFrame(ttk.Frame):
         gy_ent = tk.Entry(popup)
         gy_ent.grid(row=3, column=1, padx=10, pady=5)
         
-        tk.Label(popup, text="Major (Student, e.g., BSCO):").grid(row=4, column=0, padx=10, pady=5, sticky="e")
+        tk.Label(popup, text="Major (Student):").grid(row=4, column=0, padx=10, pady=5, sticky="e")
         maj_ent = tk.Entry(popup)
         maj_ent.grid(row=4, column=1, padx=10, pady=5)
         
-        tk.Label(popup, text="Title (Instructor, e.g., Prof):").grid(row=5, column=0, padx=10, pady=5, sticky="e")
+        tk.Label(popup, text="Title (Instructor):").grid(row=5, column=0, padx=10, pady=5, sticky="e")
         title_ent = tk.Entry(popup)
         title_ent.grid(row=5, column=1, padx=10, pady=5)
         
