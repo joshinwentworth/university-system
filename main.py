@@ -27,7 +27,17 @@ class LeopardWebRegistrationApp(tk.Tk):
         self.switch_frame(LoginFrame)
 
     def show_help(self):
-        messagebox.showinfo("Help", "Enter your Wentworth email and password to log in.\nClick the function buttons to open specific prompts.\nParameter settings will appear once a function is selected\n\nAll information should be entered in the following format:\nDepartment or Major: BSCO, BSEE, COMP, ARCH, CONM, MATH, PHYS, ENGL\nTime: Military time in hours (e.g. 08 or 14)\nDays: MTWRF\nSemester: Fall, Spring, or Summer\nYear: 20XX\nCredits: If 3 credits... list as 1 or 3 days per week, If 4 credits... list as 1, 2, or 4 days per week\nInstructor Title: Professor, Associate Professor, or Assistant Professor")
+        messagebox.showinfo("Help", "Enter your Wentworth email and password to log in.\n"
+                            "Click the function buttons to open specific prompts.\n"
+                            "Parameter settings will appear once a function is selected\n\n"
+                            "All information should be entered in the following format:\n"
+                            "Department or Major: BSCO, BSEE, COMP, ARCH, CONM, MATH, PHYS, ENGL\n"
+                            "Time: Military time in hours (e.g. 08 or 14)\n"
+                            "Days: MTWRF\n"
+                            "Semester: Fall, Spring, or Summer\n"
+                            "Year: 20XX\n"
+                            "Credits: If 3 credits... list as 1 or 3 days per week, If 4 credits... list as 1, 2, or 4 days per week\n"
+                            "Instructor Title: Professor, Associate Professor, or Assistant Professor")
 
     def show_about(self):
         messagebox.showinfo("About", "WIT LeopardWeb Registration System\nGroup Members: Hayden Pierce, Josh Kolasa")
